@@ -1,0 +1,25 @@
+package lib
+
+/*
+#include "lwip-2.2.0/src/core/def.c"
+#include "lwip-2.2.0/src/core/altcp.c"
+#include "lwip-2.2.0/src/core/timeouts.c"
+#include "lwip-2.2.0/src/core/pbuf.c"
+#include "lwip-2.2.0/src/core/inet_chksum.c"
+#include "lwip-2.2.0/src/core/sys.c"
+#include "lwip-2.2.0/src/core/tcp.c"
+#include "lwip-2.2.0/src/core/raw.c"
+#include "lwip-2.2.0/src/core/ip.c"
+#include "lwip-2.2.0/src/core/tcp_out.c"
+#include "lwip-2.2.0/src/core/init.c"
+#include "lwip-2.2.0/src/core/udp.c"
+#include "lwip-2.2.0/src/core/stats.c"
+#include "lwip-2.2.0/src/core/memp.c"
+#include "lwip-2.2.0/src/core/tcp_in.c"
+#include "lwip-2.2.0/src/core/altcp_tcp.c"
+#include "lwip-2.2.0/src/core/netif.c"
+#include "lwip-2.2.0/src/core/altcp_alloc.c"
+#include "lwip-2.2.0/src/core/dns.c"
+#include "lwip-2.2.0/src/core/mem.c"
+*/
+import "C"
