@@ -7,7 +7,7 @@ package lwip
 import "C"
 
 import (
-	_ "github.com/lkyzhu/lwip/lib"
+	_ "github.com/lkyzhu/lwip-go/lib"
 )
 
 func init() {

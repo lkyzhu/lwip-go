@@ -12,6 +12,7 @@ package netif
 #include "stdio.h"
 #include "errno.h"
 #include "macro_export.h"
+#include "lwip/prot/tcp.h"
 
 extern u8_t RawRecvFnC(void *arg, struct raw_pcb *pcb, struct pbuf *pbuf, const ip_addr_t *addr);
 
@@ -319,6 +320,20 @@ func (self *RawContext) parseIp6Hdr() int {
 }
 
 func (self *RawContext) parseTcpHdr() int {
+	hdr := TcpHdr{}
+
+	tcpHdr := (*C.struct_tcp_hdr)(self.underlay.pbuf.payload)
+
+	hdr.Src = uint16(tcpHdr.src)
+	hdr.Dest = uint16(tcpHdr.dest)
+	hdr.SeqNo = uint32(tcpHdr.seqno)
+	hdr.AckNo = uint32(tcpHdr.ackno)
+	hdr.Hlen = uint8(tcpHdr._hdrlen_rsvd_flags >> 12 & 0x0F)
+	hdr.Rsvd = uint8(tcpHdr._hdrlen_rsvd_flags >> 8 & 0x0F)
+	hdr.Flags = uint8(tcpHdr._hdrlen_rsvd_flags & 0xFF >> 2)
+	hdr.Wnd = uint16(tcpHdr.wnd)
+	hdr.ChkSum = uint16(tcpHdr.chksum)
+	hdr.Urgp = uint16(tcpHdr.urgp)
 
 	return ERR_SUCCESS
 }

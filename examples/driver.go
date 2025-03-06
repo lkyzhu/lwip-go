@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/lkyzhu/lwip/netif"
+	"github.com/lkyzhu/lwip-go/netif"
 	"github.com/sirupsen/logrus"
 	"github.com/songgao/water"
 )

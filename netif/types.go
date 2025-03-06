@@ -62,7 +62,9 @@ type TcpHdr struct {
 	Dest   uint16
 	SeqNo  uint32
 	AckNo  uint32
-	Rsvd   uint16
+	Hlen   uint8
+	Rsvd   uint8
+	Flags  uint8
 	Wnd    uint16
 	ChkSum uint16
 	Urgp   uint16

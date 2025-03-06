@@ -3,8 +3,8 @@ package main
 import (
 	"net"
 
-	"github.com/lkyzhu/lwip/dns"
-	"github.com/lkyzhu/lwip/netif"
+	"github.com/lkyzhu/lwip-go/dns"
+	"github.com/lkyzhu/lwip-go/netif"
 	"github.com/sirupsen/logrus"
 )
 

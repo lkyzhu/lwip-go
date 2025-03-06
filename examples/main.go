@@ -11,8 +11,8 @@ import (
 	"net"
 	"os"
 
-	_ "github.com/lkyzhu/lwip"
-	"github.com/lkyzhu/lwip/netif"
+	_ "github.com/lkyzhu/lwip-go"
+	"github.com/lkyzhu/lwip-go/netif"
 	"github.com/sirupsen/logrus"
 )
 

@@ -1,4 +1,4 @@
-module github.com/lkyzhu/lwip
+module github.com/lkyzhu/lwip-go
 
 go 1.22.5
 
