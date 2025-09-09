@@ -32,6 +32,21 @@ err_t netif_input2(struct pbuf *p, struct netif *inp) {
 	return inp->input(p, inp);
 }
 
+err_t netif_input_v2(void *p, u32_t size, struct netif *inp) {
+	struct pbuf *pbuf = pbuf_alloc(PBUF_RAW, size, PBUF_POOL);
+	if (pbuf == NULL) {
+		return ERR_BUF;
+	}
+
+	err_t err =pbuf_take(pbuf, p, size);
+	if (err != ERR_OK) {
+		pbuf_free(pbuf);
+		return err;
+	}
+
+	return inp->input(pbuf, inp);
+}
+
 struct netif* netif_add2(struct netif *netif, void *state){
 	return netif_add_noaddr(netif,
 		state,
@@ -69,6 +84,7 @@ type Netif struct {
 	raw     map[uint8][]*C.struct_raw_pcb
 
 	rawHandlerLock sync.RWMutex
+	pin            runtime.Pinner
 }
 
 type Interface struct {
@@ -96,24 +112,22 @@ func New(intf *Interface, driver Driver) (*Netif, error) {
 		intf:   intf,
 		driver: driver,
 		raw:    make(map[uint8][]*C.struct_raw_pcb),
+		pin:    runtime.Pinner{},
 	}
 
 	_netif = netif
 
 	uptr := unsafe.Pointer(ptr)
-	pinner := runtime.Pinner{}
-	//pinner.Pin(uptr)
 	C.netif_add2(netif.netif, uptr)
 
 	C.netif_set_default(netif.netif)
 	C.netif_set_link_up(netif.netif)
 	C.netif_set_up(netif.netif)
 
-	pinner.Pin(netif)
-	pinner.Pin(netif.netif)
-	pinner.Pin(netif.driver)
+	_netif.pin.Pin(netif)
+	_netif.pin.Pin(netif.netif)
+	_netif.pin.Pin(netif.driver)
 
-	defer pinner.Unpin()
 	return netif, nil
 }
 
@@ -144,25 +158,28 @@ func (self *Netif) Input(data []byte) (n int, err error) {
 		return 0, nil
 	}
 
-	logrus.Debugf("recv data[%v] %d bytes\n", data, C.u16_t(size))
+	logrus.Debugf("lwip.Netif.Input called, recv data[%v] %d bytesn", data, C.u16_t(size))
 
-	pbuf := C.pbuf_alloc(C.PBUF_RAW, C.u16_t(size), C.PBUF_POOL)
-	ierr := C.pbuf_take(pbuf, unsafe.Pointer(&data[0]), C.u16_t(size))
-	//ierr := C.pbuf_take(pbuf, C.CBytes(data), C.u16_t(size))
-	if ierr != C.ERR_OK {
-		C.pbuf_free(pbuf)
-		logrus.Errorf("pbuf take err:%v\n", ierr)
-		return 0, fmt.Errorf("pbuf take err:%v\n", ierr)
-	}
+	cData := C.CBytes(data)
+	pin := runtime.Pinner{}
+	pin.Pin(&cData)
 
-	ierr = C.netif_input2(pbuf, self.netif)
+	pin.Pin(self.netif)
+	defer pin.Unpin()
+
+	ierr := C.netif_input_v2(cData, C.u32_t(size), self.netif)
 	if ierr != C.ERR_OK {
-		C.pbuf_free(pbuf)
 		logrus.Errorf("netif input err:%v\n", ierr)
 		return 0, fmt.Errorf("netif input err:%v\n", ierr)
 	}
 
 	return size, nil
+}
+
+func (self *Netif) Close() error {
+	self.pin.Unpin()
+
+	return nil
 }
 
 type NetifOutputFn C.netif_output_fn

@@ -85,6 +85,14 @@ func Ipv4RawRecvFnC(ctx *RawContext) C.uchar {
 		return C.RAW_INPUT_NONE
 	}
 
+	gatway := net.ParseIP("172.50.0.1")
+	if ipHdr.Ip4.DestIp.Equal(gatway) {
+		logrus.Debugf("Ipv4RawRecvFnC get dest is gatway:%v\n", gatway)
+		return C.RAW_INPUT_NONE
+	} else {
+		logrus.Debugf("catch package for ip[%v] success", ipHdr.Ip4.DestIp.String())
+	}
+
 	proto := uint8(0)
 	if ipHdr.Ip4 != nil {
 		proto = ipHdr.Ip4.Proto
@@ -128,7 +136,7 @@ type RawContext struct {
 	underlay struct {
 		pcb   *C.struct_raw_pcb
 		pbuf  *C.struct_pbuf
-		addr  *C.ip_addr_t
+		addr  *C.ip_addr_t // remote addr
 		netif *C.struct_netif
 		arg   unsafe.Pointer
 	}
@@ -247,9 +255,9 @@ func (self *RawContext) WriteUdpPayload(data []byte) (int, error) {
 	dst := C.ip_addr_t{}
 	dstPort := C.u16_t(LwipHtons(self.udpHdr.Dest))
 	if self.ipHdr.Ip4 != nil {
-		LwipSetIp4Addr(&src, C.uint(self.ipHdr.Ip4.Src))
+		LwipSetIp4Addr(&src, C.uint(LwipHtonl(self.ipHdr.Ip4.Src)))
 		//LwipSetIp4Addr(&dst, C.uint(self.ipHdr.Ip4.Dest))
-		LwipSetIp4Addr(&(npcb.local_ip), C.uint(self.ipHdr.Ip4.Dest))
+		LwipSetIp4Addr(&(npcb.local_ip), C.uint(LwipHtonl(self.ipHdr.Ip4.Dest)))
 		npcb.local_port = C.u16_t(LwipHtons(self.udpHdr.Dest))
 	} else if self.ipHdr.Ip6 != nil {
 		//LwipSetIp6Addr(&dst, self.ipHdr.Ip6.SrcIp)
@@ -257,7 +265,7 @@ func (self *RawContext) WriteUdpPayload(data []byte) (int, error) {
 	npcb.local_port = dstPort
 
 	// send pbuf
-	logrus.Debugf("sendto src :%v/%v/%v/%v, dst:%v/%v/%v%v\n", dst, self.ipHdr.Ip4.Dest, self.ipHdr.Ip4.DestIp, dstPort, src, self.ipHdr.Ip4.Src, self.ipHdr.Ip4.SrcIp, srcPort)
+	logrus.Debugf("sendto src :%v/%v/%v/%v, dst:%v/%v/%v/%v\n", dst, self.ipHdr.Ip4.Dest, self.ipHdr.Ip4.DestIp, dstPort, src, self.ipHdr.Ip4.Src, self.ipHdr.Ip4.SrcIp, srcPort)
 	ret, errno := C.udp_sendto(npcb, pbuf, &src, srcPort)
 	if ret != C.ERR_OK {
 		err := fmt.Errorf("udp sendto fail, ret:%d, err:%v\n", ret, errno)
@@ -305,9 +313,9 @@ func (self *RawContext) parseIp4Hdr() int {
 	hdr.Ttl = uint8(iphdr._ttl)
 	hdr.Proto = uint8(iphdr._proto)
 	hdr.ChkSum = uint16(iphdr._chksum)
-	hdr.Src = uint32(iphdr.src.addr)
+	hdr.Src = LwipNtohl(uint32(iphdr.src.addr))
 	hdr.SrcIp = net.IPv4(byte(hdr.Src>>24&0xFF), byte(hdr.Src>>16&0xFF), byte(hdr.Src>>8&0xFF), byte(hdr.Src&0xFF))
-	hdr.Dest = uint32(iphdr.dest.addr)
+	hdr.Dest = LwipNtohl(uint32(iphdr.dest.addr))
 	hdr.DestIp = net.IPv4(byte(hdr.Dest>>24&0xFF), byte(hdr.Dest>>16&0xFF), byte(hdr.Dest>>8&0xFF), byte(hdr.Dest&0xFF))
 
 	self.ipHdr.Ip4 = &hdr
@@ -322,20 +330,52 @@ func (self *RawContext) parseIp6Hdr() int {
 func (self *RawContext) parseTcpHdr() int {
 	hdr := TcpHdr{}
 
-	tcpHdr := (*C.struct_tcp_hdr)(self.underlay.pbuf.payload)
+	ipHdr := self.GetIPHdr()
+	ipHLen := ipHdr.GetHLen()
+	logrus.Debugf("ipHLen:%v, self.underlay.pbuf.tot_len:%v, self.underlay.pbuf.payload:%v\n", ipHLen, self.underlay.pbuf.tot_len, self.underlay.pbuf.payload)
+	if uint16(ipHLen) > uint16(self.underlay.pbuf.tot_len) {
+		return ERR_PROTO_INVALID
+	}
 
-	hdr.Src = uint16(tcpHdr.src)
-	hdr.Dest = uint16(tcpHdr.dest)
-	hdr.SeqNo = uint32(tcpHdr.seqno)
-	hdr.AckNo = uint32(tcpHdr.ackno)
-	hdr.Hlen = uint8(tcpHdr._hdrlen_rsvd_flags >> 12 & 0x0F)
-	hdr.Rsvd = uint8(tcpHdr._hdrlen_rsvd_flags >> 8 & 0x0F)
-	hdr.Flags = uint8(tcpHdr._hdrlen_rsvd_flags & 0xFF >> 2)
-	hdr.Wnd = uint16(tcpHdr.wnd)
-	hdr.ChkSum = uint16(tcpHdr.chksum)
-	hdr.Urgp = uint16(tcpHdr.urgp)
+	payload := unsafe.Pointer(uintptr(self.underlay.pbuf.payload) + uintptr(ipHLen))
+	tcpHdr := (*C.struct_tcp_hdr)(payload)
+	logrus.Debugf("tcpHdr:%v\n", tcpHdr)
 
+	hdr.Src = LwipNtohs(uint16(tcpHdr.src))
+	hdr.Dest = LwipNtohs(uint16(tcpHdr.dest))
+	hdr.SeqNo = LwipNtohl(uint32(tcpHdr.seqno))
+	hdr.AckNo = LwipNtohl(uint32(tcpHdr.ackno))
+
+	flags := LwipNtohs(uint16(tcpHdr._hdrlen_rsvd_flags))
+	hdr.Hlen = uint8(flags >> 12 & 0x0F)
+	hdr.Rsvd = uint8(flags >> 6 & 0x3F)
+	hdr.Flags = uint8(flags & 0x3F)
+	hdr.Wnd = LwipNtohs(uint16(tcpHdr.wnd))
+	hdr.ChkSum = LwipNtohs(uint16(tcpHdr.chksum))
+	hdr.Urgp = LwipNtohs(uint16(tcpHdr.urgp))
+
+	logrus.Debugf("tcpHdr:src = %v/%v, dst=%v/%v, seqno=%v, ackno=%v, hlen=%v, rsvd=%v, flags=%b, wnd=%v, chksum=%v, urgp=%v\n", hdr.Src, tcpHdr.src, hdr.Dest, uint16(tcpHdr.dest), hdr.SeqNo, hdr.AckNo, hdr.Hlen, hdr.Rsvd, hdr.Flags, hdr.Wnd, hdr.ChkSum, hdr.Urgp)
+	self.tcpHdr = &hdr
 	return ERR_SUCCESS
+}
+
+func (self *RawContext) formatTcpHdrC() *C.struct_tcp_hdr {
+	hdr := new(C.struct_tcp_hdr)
+	tcpHdr := self.GetTcpHdr()
+	if tcpHdr == nil {
+		return nil
+	}
+
+	hdr.src = C.u16_t(tcpHdr.Src)
+	hdr.dest = C.u16_t(tcpHdr.Dest)
+	hdr.seqno = C.u32_t(tcpHdr.SeqNo)
+	hdr.ackno = C.u32_t(tcpHdr.AckNo)
+	hdr._hdrlen_rsvd_flags = C.u16_t(uint16(tcpHdr.Hlen)<<12 | uint16(tcpHdr.Rsvd)<<8 | uint16(tcpHdr.Flags)<<2)
+	hdr.wnd = C.u16_t(tcpHdr.Wnd)
+	hdr.chksum = C.u16_t(tcpHdr.ChkSum)
+	hdr.urgp = C.u16_t(tcpHdr.Urgp)
+
+	return hdr
 }
 
 func (self *RawContext) parseUdpHdr() int {

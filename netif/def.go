@@ -1,10 +1,16 @@
 package netif
 
 /*
+#include "lwipopts.h"
 #include "lwip/def.h"
 #include "lwip/ip_addr.h"
+
 u16_t lwipNtohs(u16_t n) {
     return lwip_ntohs(n);
+}
+
+u32_t lwipNtohl(u32_t n) {
+    return lwip_ntohl(n);
 }
 
 void setIp4Addr2(ip_addr_t *ip, u8_t a, u8_t b, u8_t c, u8_t d) {
@@ -32,6 +38,14 @@ func LwipNtohs(n uint16) uint16 {
 
 func LwipHtons(n uint16) uint16 {
 	return uint16(C.lwip_htons(C.u16_t(n)))
+}
+
+func LwipNtohl(n uint32) uint32 {
+	return uint32(C.lwipNtohl(C.u32_t(n)))
+}
+
+func LwipHtonl(n uint32) uint32 {
+	return uint32(C.lwip_htonl(C.u32_t(n)))
 }
 
 func LwipSetIp4Addr2(dst *C.ip_addr_t, src net.IP) {

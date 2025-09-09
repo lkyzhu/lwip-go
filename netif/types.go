@@ -50,6 +50,21 @@ type IpHdr struct {
 	Ver uint8
 }
 
+func (self *IpHdr) GetVer() uint8 {
+	return self.Ver
+}
+
+func (self *IpHdr) GetHLen() uint8 {
+	switch self.Ver {
+	case 4:
+		return self.Ip4.HLen
+	case 6:
+		return 40
+	default:
+		return 0
+	}
+}
+
 type UdpHdr struct {
 	Src    uint16
 	Dest   uint16

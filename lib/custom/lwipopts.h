@@ -77,12 +77,18 @@
 #define TCP_OUTPUT_DEBUG LWIP_DBG_ON
 #define TCPIP_DEBUG LWIP_DBG_ON
 #define IP6_DEBUG LWIP_DBG_ON
+#define TCP_RTO_DEBUG LWIP_DBG_ON
 
 #define LWIP_IPV4 1
 
 #define LWIP_STATS 0
 #define LWIP_STATS_DISPLAY 0
 #define LWIP_PERF 0
+
+// hooks
+#define LWIP_HOOK_FILENAME "lwiphooks.h"
+#define LWIP_HOOK_IP4_INPUT(pbuf, input_netif) ip4_input_hook((pbuf),(input_netif))
+//#define LWIP_HOOK_IP6_INPUT(pbuf, input_netif) ip6_input_hook((pbuf),(input_netif))
 
 #endif
 
